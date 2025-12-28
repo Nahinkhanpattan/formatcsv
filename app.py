@@ -19,20 +19,22 @@ if uploaded_file:
     df = pd.read_csv(uploaded_file)
     st.success("CSV loaded successfully!")
 
+    # -------- REQUIRED COLUMNS --------
     team_col = "team_name"
     t1_col = "teammate1_name"
     t2_col = "teammate2_name"
 
     if team_col not in df.columns or t1_col not in df.columns:
-        st.error("CSV must contain at least: team_name, teammate1_name")
+        st.error("CSV must contain: team_name, teammate1_name")
         st.stop()
 
+    # -------- OPTIONAL TEAM-LEVEL COLUMNS --------
     college_col = find_col(df, ["college", "college_name"])
+    event_col   = find_col(df, ["event", "event_name"])
     email_col   = find_col(df, ["email", "team_email"])
     phone_col   = find_col(df, ["phone", "mobile", "contact_number"])
-    event_col   = find_col(df, ["event", "event_name"])
 
-    # -------- Expand students --------
+    # -------- EXPAND STUDENTS --------
     rows = []
     base_cols = [c for c in df.columns if c not in [t1_col, t2_col]]
 
@@ -51,7 +53,7 @@ if uploaded_file:
 
     final_df = pd.DataFrame(rows)
 
-    # -------- Normalize phone numbers (CRITICAL) --------
+    # -------- NORMALIZE PHONE (IMPORTANT) --------
     if phone_col:
         final_df[phone_col] = (
             final_df[phone_col]
@@ -60,19 +62,19 @@ if uploaded_file:
             .str.strip()
         )
 
-    # -------- Reorder columns --------
+    # -------- COLUMN ORDER --------
     cols = list(final_df.columns)
     cols.remove(team_col)
     cols.remove("Student Name")
     final_df = final_df[[team_col, "Student Name"] + cols]
 
-    # -------- Write Excel --------
+    # -------- WRITE EXCEL --------
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
         final_df.to_excel(writer, index=False, sheet_name="Teams")
         ws = writer.sheets["Teams"]
 
-        def merge_within_team(col_name):
+        def merge_team_level(col_name):
             if col_name is None or col_name not in final_df.columns:
                 return
 
@@ -86,25 +88,25 @@ if uploaded_file:
                 while end <= len(final_df) and final_df.iloc[end - 1][team_col] == team:
                     end += 1
 
-                values = final_df.iloc[start - 1:end - 1][col_name].dropna().unique()
+                # MERGE ONLY IF TEAM HAS MULTIPLE STUDENTS
+                if end - start > 1:
+                    value = final_df.iloc[start - 1][col_name]
 
-                if len(values) == 1 and end - start > 1:
-                    value = values[0]
+                    if pd.notna(value):
+                        # Clear duplicate cells
+                        for r in range(start + 1, end):
+                            ws.write_blank(r, col_idx, None)
 
-                    # 🔥 Clear duplicates before merge
-                    for r in range(start + 1, end):
-                        ws.write_blank(r, col_idx, None)
-
-                    ws.merge_range(start, col_idx, end - 1, col_idx, value)
+                        ws.merge_range(start, col_idx, end - 1, col_idx, value)
 
                 start = end
 
-        # -------- Apply merges --------
-        merge_within_team(team_col)
-        merge_within_team(college_col)
-        merge_within_team(event_col)
-        merge_within_team(email_col)
-        merge_within_team(phone_col)
+        # -------- APPLY MERGES --------
+        merge_team_level(team_col)
+        merge_team_level(college_col)
+        merge_team_level(event_col)
+        merge_team_level(email_col)   # TEAM-LEVEL
+        merge_team_level(phone_col)   # TEAM-LEVEL
 
     st.success("Excel file generated successfully!")
 
