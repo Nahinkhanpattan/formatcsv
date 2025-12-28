@@ -17,10 +17,8 @@ def find_col(df, names):
 
 if uploaded_file:
     df = pd.read_csv(uploaded_file)
-
     st.success("CSV loaded successfully!")
 
-    # Required columns
     team_col = "team_name"
     t1_col = "teammate1_name"
     t2_col = "teammate2_name"
@@ -34,7 +32,7 @@ if uploaded_file:
     phone_col   = find_col(df, ["phone", "mobile", "contact_number"])
     event_col   = find_col(df, ["event", "event_name"])
 
-    # Expand students
+    # -------- Expand students --------
     rows = []
     base_cols = [c for c in df.columns if c not in [t1_col, t2_col]]
 
@@ -53,7 +51,7 @@ if uploaded_file:
 
     final_df = pd.DataFrame(rows)
 
-    # Normalize phone numbers
+    # -------- Normalize phone numbers (CRITICAL) --------
     if phone_col:
         final_df[phone_col] = (
             final_df[phone_col]
@@ -62,13 +60,13 @@ if uploaded_file:
             .str.strip()
         )
 
-    # Reorder columns
+    # -------- Reorder columns --------
     cols = list(final_df.columns)
     cols.remove(team_col)
     cols.remove("Student Name")
     final_df = final_df[[team_col, "Student Name"] + cols]
 
-    # Write Excel to memory
+    # -------- Write Excel --------
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
         final_df.to_excel(writer, index=False, sheet_name="Teams")
@@ -77,9 +75,10 @@ if uploaded_file:
         def merge_within_team(col_name):
             if col_name is None or col_name not in final_df.columns:
                 return
-            col_idx = final_df.columns.get_loc(col_name)
 
+            col_idx = final_df.columns.get_loc(col_name)
             start = 1
+
             while start <= len(final_df):
                 team = final_df.iloc[start - 1][team_col]
                 end = start
@@ -87,14 +86,20 @@ if uploaded_file:
                 while end <= len(final_df) and final_df.iloc[end - 1][team_col] == team:
                     end += 1
 
-                values = final_df.iloc[start - 1:end - 1][col_name].unique()
+                values = final_df.iloc[start - 1:end - 1][col_name].dropna().unique()
 
                 if len(values) == 1 and end - start > 1:
-                    ws.merge_range(start, col_idx, end - 1, col_idx, values[0])
+                    value = values[0]
+
+                    # 🔥 Clear duplicates before merge
+                    for r in range(start + 1, end):
+                        ws.write_blank(r, col_idx, None)
+
+                    ws.merge_range(start, col_idx, end - 1, col_idx, value)
 
                 start = end
 
-        # Apply merges
+        # -------- Apply merges --------
         merge_within_team(team_col)
         merge_within_team(college_col)
         merge_within_team(event_col)
