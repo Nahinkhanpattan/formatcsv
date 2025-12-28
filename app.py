@@ -2,8 +2,8 @@ import streamlit as st
 import pandas as pd
 import io
 
-st.set_page_config(page_title="Error Erase Formatter", layout="centered")
-st.title("📄 Error Erase – CSV to Excel Formatter")
+st.set_page_config(page_title="Event Data Formatter", layout="centered")
+st.title("📄 Event Data – CSV to Excel Formatter")
 
 uploaded_file = st.file_uploader("Upload total-part-errorErase.csv", type=["csv"])
 
@@ -58,8 +58,8 @@ if uploaded_file:
     # ---- WRITE EXCEL WITH MERGES ----
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
-        final_df.to_excel(writer, index=False, sheet_name="Error Erase")
-        ws = writer.sheets["Error Erase"]
+        final_df.to_excel(writer, index=False, sheet_name="Event Data")
+        ws = writer.sheets["Event Data"]
 
         def merge(col):
             idx = final_df.columns.get_loc(col)
@@ -86,6 +86,6 @@ if uploaded_file:
     st.download_button(
         "⬇️ Download formatted Excel",
         output.getvalue(),
-        "error_erase_final.xlsx",
+        "event_data_final.xlsx",
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
